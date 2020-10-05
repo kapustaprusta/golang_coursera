@@ -191,11 +191,7 @@ func FastSearch(out io.Writer) {
 
 	for reader.Scan() {
 		lineRaw = reader.Bytes()
-		if err != nil {
-			break
-		}
 		usersCounter++
-
 		user.UnmarshalJSON(lineRaw)
 
 		isMSIE := false
