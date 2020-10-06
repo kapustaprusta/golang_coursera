@@ -1,0 +1,25 @@
+mode: set
+/home/vnikishov/src/golang/coursera/chapter1/hw4/client.go:76.80,80.19 2 1
+/home/vnikishov/src/golang/coursera/chapter1/hw4/client.go:83.2,83.20 1 1
+/home/vnikishov/src/golang/coursera/chapter1/hw4/client.go:86.2,86.20 1 1
+/home/vnikishov/src/golang/coursera/chapter1/hw4/client.go:91.2,103.16 10 1
+/home/vnikishov/src/golang/coursera/chapter1/hw4/client.go:109.2,112.25 3 1
+/home/vnikishov/src/golang/coursera/chapter1/hw4/client.go:129.2,131.16 3 1
+/home/vnikishov/src/golang/coursera/chapter1/hw4/client.go:135.2,136.28 2 1
+/home/vnikishov/src/golang/coursera/chapter1/hw4/client.go:143.2,143.21 1 1
+/home/vnikishov/src/golang/coursera/chapter1/hw4/client.go:80.19,82.3 1 1
+/home/vnikishov/src/golang/coursera/chapter1/hw4/client.go:83.20,85.3 1 1
+/home/vnikishov/src/golang/coursera/chapter1/hw4/client.go:86.20,88.3 1 1
+/home/vnikishov/src/golang/coursera/chapter1/hw4/client.go:103.16,104.54 1 1
+/home/vnikishov/src/golang/coursera/chapter1/hw4/client.go:107.3,107.50 1 1
+/home/vnikishov/src/golang/coursera/chapter1/hw4/client.go:104.54,106.4 1 1
+/home/vnikishov/src/golang/coursera/chapter1/hw4/client.go:113.31,114.44 1 1
+/home/vnikishov/src/golang/coursera/chapter1/hw4/client.go:115.38,116.53 1 1
+/home/vnikishov/src/golang/coursera/chapter1/hw4/client.go:117.29,120.17 3 1
+/home/vnikishov/src/golang/coursera/chapter1/hw4/client.go:123.3,123.44 1 1
+/home/vnikishov/src/golang/coursera/chapter1/hw4/client.go:126.3,126.73 1 1
+/home/vnikishov/src/golang/coursera/chapter1/hw4/client.go:120.17,122.4 1 1
+/home/vnikishov/src/golang/coursera/chapter1/hw4/client.go:123.44,125.4 1 1
+/home/vnikishov/src/golang/coursera/chapter1/hw4/client.go:131.16,133.3 1 1
+/home/vnikishov/src/golang/coursera/chapter1/hw4/client.go:136.28,139.3 2 1
+/home/vnikishov/src/golang/coursera/chapter1/hw4/client.go:139.8,141.3 1 1
