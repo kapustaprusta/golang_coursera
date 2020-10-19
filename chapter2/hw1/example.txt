@@ -1,0 +1,170 @@
+6: *ast.GenDecl {
+   763  .  .  .  TokPos: -
+   764  .  .  .  Tok: type
+   765  .  .  .  Lparen: -
+   766  .  .  .  Specs: []ast.Spec (len = 1) {
+   767  .  .  .  .  0: *ast.TypeSpec {
+   768  .  .  .  .  .  Name: *ast.Ident {
+   769  .  .  .  .  .  .  NamePos: -
+   770  .  .  .  .  .  .  Name: "ProfileParams"
+   771  .  .  .  .  .  .  Obj: *ast.Object {
+   772  .  .  .  .  .  .  .  Kind: type
+   773  .  .  .  .  .  .  .  Name: "ProfileParams"
+   774  .  .  .  .  .  .  .  Decl: *(obj @ 767)
+   775  .  .  .  .  .  .  }
+   776  .  .  .  .  .  }
+   777  .  .  .  .  .  Assign: -
+   778  .  .  .  .  .  Type: *ast.StructType {
+   779  .  .  .  .  .  .  Struct: -
+   780  .  .  .  .  .  .  Fields: *ast.FieldList {
+   781  .  .  .  .  .  .  .  Opening: -
+   782  .  .  .  .  .  .  .  List: []*ast.Field (len = 1) {
+   783  .  .  .  .  .  .  .  .  0: *ast.Field {
+   784  .  .  .  .  .  .  .  .  .  Names: []*ast.Ident (len = 1) {
+   785  .  .  .  .  .  .  .  .  .  .  0: *ast.Ident {
+   786  .  .  .  .  .  .  .  .  .  .  .  NamePos: -
+   787  .  .  .  .  .  .  .  .  .  .  .  Name: "Login"
+   788  .  .  .  .  .  .  .  .  .  .  .  Obj: *ast.Object {
+   789  .  .  .  .  .  .  .  .  .  .  .  .  Kind: var
+   790  .  .  .  .  .  .  .  .  .  .  .  .  Name: "Login"
+   791  .  .  .  .  .  .  .  .  .  .  .  .  Decl: *(obj @ 783)
+   792  .  .  .  .  .  .  .  .  .  .  .  }
+   793  .  .  .  .  .  .  .  .  .  .  }
+   794  .  .  .  .  .  .  .  .  .  }
+   795  .  .  .  .  .  .  .  .  .  Type: *ast.Ident {
+   796  .  .  .  .  .  .  .  .  .  .  NamePos: -
+   797  .  .  .  .  .  .  .  .  .  .  Name: "string"
+   798  .  .  .  .  .  .  .  .  .  }
+   799  .  .  .  .  .  .  .  .  .  Tag: *ast.BasicLit {
+   800  .  .  .  .  .  .  .  .  .  .  ValuePos: -
+   801  .  .  .  .  .  .  .  .  .  .  Kind: STRING
+   802  .  .  .  .  .  .  .  .  .  .  Value: "`apivalidator:\"required\"`"
+   803  .  .  .  .  .  .  .  .  .  }
+   804  .  .  .  .  .  .  .  .  }
+   805  .  .  .  .  .  .  .  }
+   806  .  .  .  .  .  .  .  Closing: -
+   807  .  .  .  .  .  .  }
+   808  .  .  .  .  .  .  Incomplete: false
+   809  .  .  .  .  .  }
+   810  .  .  .  .  }
+   811  .  .  .  }
+   812  .  .  .  Rparen: -
+   813  .  .  }
+   814  .  .  7: *ast.GenDecl {
+   815  .  .  .  TokPos: -
+   816  .  .  .  Tok: type
+   817  .  .  .  Lparen: -
+   818  .  .  .  Specs: []ast.Spec (len = 1) {
+   819  .  .  .  .  0: *ast.TypeSpec {
+   820  .  .  .  .  .  Name: *ast.Ident {
+   821  .  .  .  .  .  .  NamePos: -
+   822  .  .  .  .  .  .  Name: "CreateParams"
+   823  .  .  .  .  .  .  Obj: *ast.Object {
+   824  .  .  .  .  .  .  .  Kind: type
+   825  .  .  .  .  .  .  .  Name: "CreateParams"
+   826  .  .  .  .  .  .  .  Decl: *(obj @ 819)
+   827  .  .  .  .  .  .  }
+   828  .  .  .  .  .  }
+   829  .  .  .  .  .  Assign: -
+   830  .  .  .  .  .  Type: *ast.StructType {
+   831  .  .  .  .  .  .  Struct: -
+   832  .  .  .  .  .  .  Fields: *ast.FieldList {
+   833  .  .  .  .  .  .  .  Opening: -
+   834  .  .  .  .  .  .  .  List: []*ast.Field (len = 4) {
+   835  .  .  .  .  .  .  .  .  0: *ast.Field {
+   836  .  .  .  .  .  .  .  .  .  Names: []*ast.Ident (len = 1) {
+   837  .  .  .  .  .  .  .  .  .  .  0: *ast.Ident {
+   838  .  .  .  .  .  .  .  .  .  .  .  NamePos: -
+   839  .  .  .  .  .  .  .  .  .  .  .  Name: "Login"
+   840  .  .  .  .  .  .  .  .  .  .  .  Obj: *ast.Object {
+   841  .  .  .  .  .  .  .  .  .  .  .  .  Kind: var
+   842  .  .  .  .  .  .  .  .  .  .  .  .  Name: "Login"
+   843  .  .  .  .  .  .  .  .  .  .  .  .  Decl: *(obj @ 835)
+   844  .  .  .  .  .  .  .  .  .  .  .  }
+   845  .  .  .  .  .  .  .  .  .  .  }
+   846  .  .  .  .  .  .  .  .  .  }
+   847  .  .  .  .  .  .  .  .  .  Type: *ast.Ident {
+   848  .  .  .  .  .  .  .  .  .  .  NamePos: -
+   849  .  .  .  .  .  .  .  .  .  .  Name: "string"
+   850  .  .  .  .  .  .  .  .  .  }
+   851  .  .  .  .  .  .  .  .  .  Tag: *ast.BasicLit {
+   852  .  .  .  .  .  .  .  .  .  .  ValuePos: -
+   853  .  .  .  .  .  .  .  .  .  .  Kind: STRING
+   854  .  .  .  .  .  .  .  .  .  .  Value: "`apivalidator:\"required,min=10\"`"
+   855  .  .  .  .  .  .  .  .  .  }
+   856  .  .  .  .  .  .  .  .  }
+   857  .  .  .  .  .  .  .  .  1: *ast.Field {
+   858  .  .  .  .  .  .  .  .  .  Names: []*ast.Ident (len = 1) {
+   859  .  .  .  .  .  .  .  .  .  .  0: *ast.Ident {
+   860  .  .  .  .  .  .  .  .  .  .  .  NamePos: -
+   861  .  .  .  .  .  .  .  .  .  .  .  Name: "Name"
+   862  .  .  .  .  .  .  .  .  .  .  .  Obj: *ast.Object {
+   863  .  .  .  .  .  .  .  .  .  .  .  .  Kind: var
+   864  .  .  .  .  .  .  .  .  .  .  .  .  Name: "Name"
+   865  .  .  .  .  .  .  .  .  .  .  .  .  Decl: *(obj @ 857)
+   866  .  .  .  .  .  .  .  .  .  .  .  }
+   867  .  .  .  .  .  .  .  .  .  .  }
+   868  .  .  .  .  .  .  .  .  .  }
+   869  .  .  .  .  .  .  .  .  .  Type: *ast.Ident {
+   870  .  .  .  .  .  .  .  .  .  .  NamePos: -
+   871  .  .  .  .  .  .  .  .  .  .  Name: "string"
+   872  .  .  .  .  .  .  .  .  .  }
+   873  .  .  .  .  .  .  .  .  .  Tag: *ast.BasicLit {
+   874  .  .  .  .  .  .  .  .  .  .  ValuePos: -
+   875  .  .  .  .  .  .  .  .  .  .  Kind: STRING
+   876  .  .  .  .  .  .  .  .  .  .  Value: "`apivalidator:\"paramname=full_name\"`"
+   877  .  .  .  .  .  .  .  .  .  }
+   878  .  .  .  .  .  .  .  .  }
+   879  .  .  .  .  .  .  .  .  2: *ast.Field {
+   880  .  .  .  .  .  .  .  .  .  Names: []*ast.Ident (len = 1) {
+   881  .  .  .  .  .  .  .  .  .  .  0: *ast.Ident {
+   882  .  .  .  .  .  .  .  .  .  .  .  NamePos: -
+   883  .  .  .  .  .  .  .  .  .  .  .  Name: "Status"
+   884  .  .  .  .  .  .  .  .  .  .  .  Obj: *ast.Object {
+   885  .  .  .  .  .  .  .  .  .  .  .  .  Kind: var
+   886  .  .  .  .  .  .  .  .  .  .  .  .  Name: "Status"
+   887  .  .  .  .  .  .  .  .  .  .  .  .  Decl: *(obj @ 879)
+   888  .  .  .  .  .  .  .  .  .  .  .  }
+   889  .  .  .  .  .  .  .  .  .  .  }
+   890  .  .  .  .  .  .  .  .  .  }
+   891  .  .  .  .  .  .  .  .  .  Type: *ast.Ident {
+   892  .  .  .  .  .  .  .  .  .  .  NamePos: -
+   893  .  .  .  .  .  .  .  .  .  .  Name: "string"
+   894  .  .  .  .  .  .  .  .  .  }
+   895  .  .  .  .  .  .  .  .  .  Tag: *ast.BasicLit {
+   896  .  .  .  .  .  .  .  .  .  .  ValuePos: -
+   897  .  .  .  .  .  .  .  .  .  .  Kind: STRING
+   898  .  .  .  .  .  .  .  .  .  .  Value: "`apivalidator:\"enum=user|moderator|admin,default=user\"`"
+   899  .  .  .  .  .  .  .  .  .  }
+   900  .  .  .  .  .  .  .  .  }
+   901  .  .  .  .  .  .  .  .  3: *ast.Field {
+   902  .  .  .  .  .  .  .  .  .  Names: []*ast.Ident (len = 1) {
+   903  .  .  .  .  .  .  .  .  .  .  0: *ast.Ident {
+   904  .  .  .  .  .  .  .  .  .  .  .  NamePos: -
+   905  .  .  .  .  .  .  .  .  .  .  .  Name: "Age"
+   906  .  .  .  .  .  .  .  .  .  .  .  Obj: *ast.Object {
+   907  .  .  .  .  .  .  .  .  .  .  .  .  Kind: var
+   908  .  .  .  .  .  .  .  .  .  .  .  .  Name: "Age"
+   909  .  .  .  .  .  .  .  .  .  .  .  .  Decl: *(obj @ 901)
+   910  .  .  .  .  .  .  .  .  .  .  .  }
+   911  .  .  .  .  .  .  .  .  .  .  }
+   912  .  .  .  .  .  .  .  .  .  }
+   913  .  .  .  .  .  .  .  .  .  Type: *ast.Ident {
+   914  .  .  .  .  .  .  .  .  .  .  NamePos: -
+   915  .  .  .  .  .  .  .  .  .  .  Name: "int"
+   916  .  .  .  .  .  .  .  .  .  }
+   917  .  .  .  .  .  .  .  .  .  Tag: *ast.BasicLit {
+   918  .  .  .  .  .  .  .  .  .  .  ValuePos: -
+   919  .  .  .  .  .  .  .  .  .  .  Kind: STRING
+   920  .  .  .  .  .  .  .  .  .  .  Value: "`apivalidator:\"min=0,max=128\"`"
+   921  .  .  .  .  .  .  .  .  .  }
+   922  .  .  .  .  .  .  .  .  }
+   923  .  .  .  .  .  .  .  }
+   924  .  .  .  .  .  .  .  Closing: -
+   925  .  .  .  .  .  .  }
+   926  .  .  .  .  .  .  Incomplete: false
+   927  .  .  .  .  .  }
+   928  .  .  .  .  }
+   929  .  .  .  }
+   930  .  .  .  Rparen: -
+   931  .  .  }
