@@ -90,7 +90,7 @@ func validateCreateParams(q map[string][]string,) (CreateParams, error) {
 func (s *MyApi) handleProfile(w http.ResponseWriter, r *http.Request) {
 	params, err := validateProfileParams(r.URL.Query())
 	if err != nil {
-		errJSON := fmt.Sprintf("{error: \"%s\"}", err)
+		errJSON := fmt.Sprintf("{\"error\": \"%s\"}", err)
 		errRaw, _ := json.Marshal(errJSON)
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write(errRaw)
@@ -101,9 +101,9 @@ func (s *MyApi) handleProfile(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	res, err := s.Profile(ctx, params)
 	if err != nil {
-		errJSON := fmt.Sprintf("{error: \"%s\"}", err)
+		errJSON := fmt.Sprintf("{\"error\": \"%s\"}", err)
 		errRaw, _ := json.Marshal(errJSON)
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusInternalServerError)
 		w.Write(errRaw)
 
 		return
@@ -115,9 +115,14 @@ func (s *MyApi) handleProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *MyApi) handleCreate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		w.Write([]byte("{\"error\": \"bad method\"}"))
+	}
+	
 	params, err := validateCreateParams(r.URL.Query())
 	if err != nil {
-		errJSON := fmt.Sprintf("{error: \"%s\"}", err)
+		errJSON := fmt.Sprintf("{\"error\": \"%s\"}", err)
 		errRaw, _ := json.Marshal(errJSON)
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write(errRaw)
@@ -128,9 +133,9 @@ func (s *MyApi) handleCreate(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	res, err := s.Create(ctx, params)
 	if err != nil {
-		errJSON := fmt.Sprintf("{error: \"%s\"}", err)
+		errJSON := fmt.Sprintf("{\"error\": \"%s\"}", err)
 		errRaw, _ := json.Marshal(errJSON)
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusInternalServerError)
 		w.Write(errRaw)
 
 		return
@@ -205,9 +210,14 @@ func validateOtherCreateParams(q map[string][]string,) (OtherCreateParams, error
 }
 
 func (s *OtherApi) handleCreate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		w.Write([]byte("{\"error\": \"bad method\"}"))
+	}
+	
 	params, err := validateOtherCreateParams(r.URL.Query())
 	if err != nil {
-		errJSON := fmt.Sprintf("{error: \"%s\"}", err)
+		errJSON := fmt.Sprintf("{\"error\": \"%s\"}", err)
 		errRaw, _ := json.Marshal(errJSON)
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write(errRaw)
@@ -218,9 +228,9 @@ func (s *OtherApi) handleCreate(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	res, err := s.Create(ctx, params)
 	if err != nil {
-		errJSON := fmt.Sprintf("{error: \"%s\"}", err)
+		errJSON := fmt.Sprintf("{\"error\": \"%s\"}", err)
 		errRaw, _ := json.Marshal(errJSON)
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusInternalServerError)
 		w.Write(errRaw)
 
 		return
@@ -229,5 +239,29 @@ func (s *OtherApi) handleCreate(w http.ResponseWriter, r *http.Request) {
 	resRaw, _ := json.Marshal(res)
 	w.WriteHeader(http.StatusOK)
 	w.Write(resRaw)
+}
+
+func (s *MyApi) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	switch r.URL.Path {
+	case "/user/profile":
+		s.handleProfile(w, r)
+	case "/user/create":
+		s.handleCreate(w, r)
+	default:
+		errRaw, _ := json.Marshal("{\"error\": \"unknown method\"}")
+		w.WriteHeader(http.StatusNotFound)
+		w.Write(errRaw)
+	}
+}
+
+func (s *OtherApi) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	switch r.URL.Path {
+	case "/user/create":
+		s.handleCreate(w, r)
+	default:
+		errRaw, _ := json.Marshal("{\"error\": \"unknown method\"}")
+		w.WriteHeader(http.StatusNotFound)
+		w.Write(errRaw)
+	}
 }
 

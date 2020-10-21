@@ -16,8 +16,14 @@ var (
 	genKeyword = "apigen:api "
 	valKeyword = "apivalidator:"
 
-	handlers = make(map[string]string)
+	srvs = make(map[string][]*Method)
 )
+
+// Server ...
+type Server struct {
+	Name     string
+	Handlers map[string]string
+}
 
 // Method ...
 type Method struct {
@@ -129,13 +135,21 @@ func generateHandler(w io.Writer, f *ast.FuncDecl) {
 	if method == nil {
 		return
 	}
+	srvs[method.Recv] = append(srvs[method.Recv], method)
 
-	handlers[method.Name] = method.URL
+	methodHandler := fmt.Sprintf("func (s *%s) handle%s(w http.ResponseWriter, r *http.Request) {\n", method.Recv, method.Name)
+	if method.Method != "" {
+		methodHandler += fmt.Sprintf(`	if r.Method != "%s" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		w.Write([]byte("{\"error\": \"bad method\"}"))
+	}
+	
+`, method.Method)
+	}
 
-	fmt.Fprintf(w, `func (s *%s) handle%s(w http.ResponseWriter, r *http.Request) {
-	params, err := validate%s(r.URL.Query())
+	methodHandler += fmt.Sprintf(`	params, err := validate%s(r.URL.Query())
 	if err != nil {
-		errJSON := fmt.Sprintf("{error: \"%s\"}", err)
+		errJSON := fmt.Sprintf("{\"error\": \"%s\"}", err)
 		errRaw, _ := json.Marshal(errJSON)
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write(errRaw)
@@ -146,9 +160,9 @@ func generateHandler(w io.Writer, f *ast.FuncDecl) {
 	ctx := context.Background()
 	res, err := s.%s(ctx, params)
 	if err != nil {
-		errJSON := fmt.Sprintf("{error: \"%s\"}", err)
+		errJSON := fmt.Sprintf("{\"error\": \"%s\"}", err)
 		errRaw, _ := json.Marshal(errJSON)
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusInternalServerError)
 		w.Write(errRaw)
 
 		return
@@ -159,7 +173,9 @@ func generateHandler(w io.Writer, f *ast.FuncDecl) {
 	w.Write(resRaw)
 }
 
-`, method.Recv, method.Name, method.Params[0], "%s", method.Name, "%s")
+`, method.Params[0], "%s", method.Name, "%s")
+
+	fmt.Fprint(w, methodHandler)
 }
 
 func generateValidator(w io.Writer, g *ast.GenDecl) {
@@ -268,6 +284,29 @@ func generateValidator(w io.Writer, g *ast.GenDecl) {
 	}
 }
 
+func generateSrvs(w io.Writer, srvs map[string][]*Method) {
+	for srvName, srvMethods := range srvs {
+		fmt.Fprintf(w, "func (s *%s) ServeHTTP(w http.ResponseWriter, r *http.Request) {\n", srvName)
+		if len(srvMethods) != 0 {
+			fmt.Fprint(w, `	switch r.URL.Path {`)
+			for _, method := range srvMethods {
+				fmt.Fprintf(w, `
+	case "%s":
+		s.handle%s(w, r)`, method.URL, method.Name)
+			}
+			fmt.Fprint(w, `
+	default:
+		errRaw, _ := json.Marshal("{\"error\": \"unknown method\"}")
+		w.WriteHeader(http.StatusNotFound)
+		w.Write(errRaw)
+	}
+}
+
+`)
+		}
+	}
+}
+
 func generateAPI(inputFilePath string, outputFilePath string) error {
 	// parse input file
 	parsedFile, err := parseFile(inputFilePath)
@@ -304,6 +343,9 @@ func generateAPI(inputFilePath string, outputFilePath string) error {
 			generateValidator(outputFile, genDecl)
 		}
 	}
+
+	// write servers
+	generateSrvs(outputFile, srvs)
 
 	return nil
 }
