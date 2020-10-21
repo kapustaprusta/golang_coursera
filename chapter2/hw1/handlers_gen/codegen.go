@@ -16,8 +16,7 @@ var (
 	genKeyword = "apigen:api "
 	valKeyword = "apivalidator:"
 
-	handlers   = make(map[string]string)
-	validators = make(map[string]string)
+	handlers = make(map[string]string)
 )
 
 // Method ...
@@ -131,15 +130,36 @@ func generateHandler(w io.Writer, f *ast.FuncDecl) {
 		return
 	}
 
-	fmt.Fprintf(w, `func (s *%s) handle%s(w http.Response, r *http.Request) {
-	// Fill params
-	// Validate
+	handlers[method.Name] = method.URL
+
+	fmt.Fprintf(w, `func (s *%s) handle%s(w http.ResponseWriter, r *http.Request) {
+	params, err := validate%s(r.URL.Query())
+	if err != nil {
+		errJSON := fmt.Sprintf("{error: \"%s\"}", err)
+		errRaw, _ := json.Marshal(errJSON)
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write(errRaw)
+
+		return
+	}
 
 	ctx := context.Background()
 	res, err := s.%s(ctx, params)
+	if err != nil {
+		errJSON := fmt.Sprintf("{error: \"%s\"}", err)
+		errRaw, _ := json.Marshal(errJSON)
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write(errRaw)
+
+		return
+	}
+
+	resRaw, _ := json.Marshal(res)
+	w.WriteHeader(http.StatusOK)
+	w.Write(resRaw)
 }
 
-`, method.Recv, method.Name, method.Name)
+`, method.Recv, method.Name, method.Params[0], "%s", method.Name, "%s")
 }
 
 func generateValidator(w io.Writer, g *ast.GenDecl) {
@@ -148,73 +168,103 @@ func generateValidator(w io.Writer, g *ast.GenDecl) {
 		return
 	}
 
+	getSplittedTags := func(tag string) []string {
+		bParamsPos := strings.Index(tag, `"`) + 1
+		eParamsPos := strings.LastIndex(tag, `"`)
+
+		return strings.Split(tag[bParamsPos:eParamsPos], ",")
+	}
+
 	funcBody := ""
 	for _, field := range s.Fields {
 		if strings.Contains(field.Tag, valKeyword) {
+			funcBody += fmt.Sprintf("\t// %s\n", field.Name)
+			tagVals := make(map[string][]string)
+			splittedTags := getSplittedTags(field.Tag)
+			for _, tag := range splittedTags {
+				tagVal := ""
+				splittedTag := strings.Split(tag, "=")
+				if len(splittedTag) > 1 {
+					tagVal = splittedTag[1]
+				}
+				tagName := splittedTag[0]
+				tagVals[tagName] = strings.Split(tagVal, "|")
+			}
+
+			// paramname
 			paramName := strings.ToLower(field.Name)
-			pureTags := field.Tag[strings.Index(field.Tag, "\"")+1 : strings.LastIndex(field.Tag, "\"")]
-			for _, tag := range strings.Split(pureTags, ",") {
+			if tagVal, isExist := tagVals["paramname"]; isExist {
+				paramName = tagVal[0]
+			}
+
+			if field.Type == "string" {
+				funcBody += fmt.Sprintf("\tif params, isExist := q[\"%s\"]; isExist {\n\t\tp.%s = params[0];\n\t}\n\n", paramName, field.Name)
+			} else if field.Type == "int" {
+				funcBody += fmt.Sprintf("\tif params, isExist := q[\"%s\"]; isExist {\n", paramName)
+				funcBody += "\t\tn, err := strconv.Atoi(params[0])\n\t\tif err != nil{\n"
+				funcBody += fmt.Sprintf("\t\t\treturn p, errors.New(\"%s must be int\")\n\t\t}\n\n", paramName)
+				funcBody += fmt.Sprintf("\t\tp.%s = n\n\t}\n\n", field.Name)
+			}
+
+			// default
+			if tagVal, isExist := tagVals["default"]; isExist {
 				if field.Type == "string" {
-					tagName := strings.Split(tag, "=")[0]
-					switch tagName {
-					case "required":
-						funcBody += fmt.Sprintf(`	if _, isExist := q["%s"]; !isExist {
-		return errors.New("%s must me not empty")
-	}
-`, paramName, paramName)
-						funcBody += fmt.Sprintf("\tp.%s = q[\"%s\"][0]\n\n", field.Name, paramName)
-					case "paramname":
-						paramName = strings.Split(tag, "=")[1]
-					case "enum":
-						funcBody += "\tisAllowed := false\n\tallowedVals := []string{"
-						allowedVals := strings.Split(strings.Split(tag, "=")[1], "|")
-						for valIdx, val := range allowedVals {
-							comma := ","
-							if len(allowedVals)-1 == valIdx {
-								comma = "}"
-							}
-							funcBody += "\"" + val + "\"" + comma
-						}
-						funcBody += "\n"
-
-						funcBody += "\tfor _, val := range allowedVals {\n"
-						funcBody += fmt.Sprintf(`		if q["%s"][0] == val {
-			p.%s = val
-			isAllowed = true
-			break
-		}
-	}
-`, paramName, field.Name)
-
-						funcBody += fmt.Sprintf("\tif !isAllowed {\n\t\treturn errors.New(\"%s must be one of ", paramName)
-						funcBody += "[" + strings.Join(allowedVals, ", ") + "]\")\n\t}\n\n"
-					case "default":
-						funcBody += fmt.Sprintf("\tp.%s = q[\"%s\"][0]\n", field.Name, paramName)
-						funcBody += fmt.Sprintf(`	if p.%s == "" {
-		p.%s = "%s"
-	}`, field.Name, field.Name, strings.Split(tag, "=")[1])
-					case "min":
-
-					default:
-						continue
-					}
+					funcBody += fmt.Sprintf("\tif p.%s == \"\" {\n\t\tp.%s = \"%s\"\n\t}\n\n", field.Name, field.Name, tagVal[0])
 				} else if field.Type == "int" {
+					funcBody += fmt.Sprintf("\tif p.%s == 0 {\n\t\tp.%s = %s\n\t}\n\n", field.Name, field.Name, tagVal[0])
+				}
+			}
 
+			// required
+			if _, isExist := tagVals["required"]; isExist {
+				if field.Type == "string" {
+					funcBody += fmt.Sprintf("\tif p.%s == \"\" {\n\t\treturn p, errors.New(\"%s must me not empty\")\n\t}\n\n", field.Name, paramName)
+				} else if field.Type == "int" {
+					funcBody += fmt.Sprintf("\tif p.%s == 0 {\n\t\treturn p, errors.New(\"%s must me not 0\")\n\t}\n\n", field.Name, paramName)
+				}
+			}
+
+			// enum
+			if tagVal, isExist := tagVals["enum"]; isExist {
+				if field.Type == "string" {
+					funcBody += "\tisAllowed := false\n\tallowedVals := []string{"
+					sliceVals := []string{}
+					for _, val := range tagVal {
+						sliceVals = append(sliceVals, "\""+val+"\"")
+					}
+					funcBody += strings.Join(sliceVals, ", ") + "}\n"
+				} else if field.Type == "int" {
+					funcBody += "\tisAllowed := false\n\tallowedVals := []int{"
+					funcBody += strings.Join(tagVal, ", ") + "}\n"
+				}
+				funcBody += "\tfor _, val := range allowedVals {\n"
+				funcBody += fmt.Sprintf("\t\tif p.%s == val {\n\t\t\tisAllowed = true\n\t\t\tbreak\n\t\t}\n\t}\n", field.Name)
+				funcBody += fmt.Sprintf("\tif !isAllowed {\n\t\treturn p, errors.New(\"%s must be one of ", paramName)
+				funcBody += "[" + strings.Join(tagVal, ", ") + "]\")\n\t}\n\n"
+			}
+
+			// min
+			if tagVal, isExist := tagVals["min"]; isExist {
+				if field.Type == "string" {
+					funcBody += fmt.Sprintf("\tif len(p.%s) < %s {\n\t\treturn p, errors.New(\"%s len must be >= %s\")\n\t}\n\n", field.Name, tagVal[0], paramName, tagVal[0])
+				} else if field.Type == "int" {
+					funcBody += fmt.Sprintf("\tif p.%s < %s {\n\t\treturn p, errors.New(\"%s must be >= %s\")\n\t}\n\n", field.Name, tagVal[0], paramName, tagVal[0])
+				}
+			}
+
+			// max
+			if tagVal, isExist := tagVals["max"]; isExist {
+				if field.Type == "string" {
+					funcBody += fmt.Sprintf("\tif len(p.%s) > %s {\n\t\treturn p, errors.New(\"%s len must be <= %s\")\n\t}\n\n", field.Name, tagVal[0], paramName, tagVal[0])
+				} else if field.Type == "int" {
+					funcBody += fmt.Sprintf("\tif p.%s > %s {\n\t\treturn p, errors.New(\"%s must be <= %s\")\n\t}\n\n", field.Name, tagVal[0], paramName, tagVal[0])
 				}
 			}
 		}
 	}
 
 	if funcBody != "" {
-		fmt.Fprintf(w, `func validate%s(q map[string][]string, p *%s) error {
-%s
-
-	return nil
-}
-
-`, s.Name, s.Name, funcBody)
-
-		validators[s.Name] = "validate" + s.Name
+		fmt.Fprintf(w, "func validate%s(q map[string][]string,) (%s, error) {\n\tp := %s{}\n\n%s\treturn p, nil\n}\n\n", s.Name, s.Name, s.Name, funcBody)
 	}
 }
 
@@ -238,16 +288,19 @@ func generateAPI(inputFilePath string, outputFilePath string) error {
 		return err
 	}
 
-	_, err = fmt.Fprintf(outputFile, "import (\n\t\"context\"\n\t\"errors\"\n\t\"net/http\"\n)\n\n")
+	_, err = fmt.Fprintf(outputFile, "import (\n\t\"context\"\n\t\"encoding/json\"\n\t\"errors\"\n\t\"fmt\"\n\t\"net/http\"\n\t\"strconv\"\n)\n\n")
 	if err != nil {
 		return err
 	}
 
 	// write handlers for methods and validators for structs
 	for _, decl := range parsedFile.Decls {
-		if funcDecl, isOk := decl.(*ast.FuncDecl); isOk {
+		switch decl.(type) {
+		case *ast.FuncDecl:
+			funcDecl, _ := decl.(*ast.FuncDecl)
 			generateHandler(outputFile, funcDecl)
-		} else if genDecl, isOk := decl.(*ast.GenDecl); isOk {
+		case *ast.GenDecl:
+			genDecl, _ := decl.(*ast.GenDecl)
 			generateValidator(outputFile, genDecl)
 		}
 	}
