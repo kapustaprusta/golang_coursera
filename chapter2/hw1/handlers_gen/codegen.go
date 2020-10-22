@@ -140,17 +140,88 @@ func generateHandler(w io.Writer, f *ast.FuncDecl) {
 	methodHandler := fmt.Sprintf("func (s *%s) handle%s(w http.ResponseWriter, r *http.Request) {\n", method.Recv, method.Name)
 	if method.Method != "" {
 		methodHandler += fmt.Sprintf(`	if r.Method != "%s" {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		w.Write([]byte("{\"error\": \"bad method\"}"))
+		handlerErr := struct {
+			Err string %s
+		}{
+			Err: "bad method",
+		}
+		errRaw, _ := json.Marshal(handlerErr)
+		
+		w.WriteHeader(http.StatusNotAcceptable)
+		w.Write(errRaw)
+
+		return
 	}
 	
-`, method.Method)
+`, method.Method, "`json:\"error\"`")
+
+		if method.Method == "POST" {
+			methodHandler += fmt.Sprint(`	defer r.Body.Close()
+	bodyRaw, _ := ioutil.ReadAll(r.Body)
+	body := string(bodyRaw)
+
+	query := make(map[string][]string)
+	for _, param := range strings.Split(body, "&") {
+		splittedParam := strings.Split(param, "=")
+		if len(splittedParam) > 1 {
+			query[splittedParam[0]] = append(query[splittedParam[0]], splittedParam[1])
+		}
 	}
 
-	methodHandler += fmt.Sprintf(`	params, err := validate%s(r.URL.Query())
+`)
+		} else if method.Method == "GET" {
+			methodHandler += `	query := r.URL.Query()
+
+`
+		}
+	} else {
+		methodHandler += fmt.Sprint(`	query := make(map[string][]string)
+	if r.Method == "POST" {
+		defer r.Body.Close()
+		bodyRaw, _ := ioutil.ReadAll(r.Body)
+		body := string(bodyRaw)
+	
+		for _, param := range strings.Split(body, "&") {
+			splittedParam := strings.Split(param, "=")
+			if len(splittedParam) > 1 {
+				query[splittedParam[0]] = append(query[splittedParam[0]], splittedParam[1])
+			}
+		}
+	} else if r.Method == "GET" {
+		query = r.URL.Query()
+	}
+
+`)
+	}
+
+	if method.Auth {
+		methodHandler += fmt.Sprintf(`	authToken := r.Header.Get("X-Auth")
+	if authToken == "" {
+		handlerErr := struct {
+			Err string %s
+		}{
+			Err: "unauthorized",
+		}
+		errRaw, _ := json.Marshal(handlerErr)
+		
+		w.WriteHeader(http.StatusForbidden)
+		w.Write(errRaw)
+
+		return
+	}
+
+`, "`json:\"error\"`")
+	}
+
+	methodHandler += fmt.Sprintf(`	params, err := validate%s(query)
 	if err != nil {
-		errJSON := fmt.Sprintf("{\"error\": \"%s\"}", err)
-		errRaw, _ := json.Marshal(errJSON)
+		handlerErr := struct {
+			Err string %s
+		}{
+			Err: err.Error(),
+		}
+		errRaw, _ := json.Marshal(handlerErr)
+		
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write(errRaw)
 
@@ -158,22 +229,39 @@ func generateHandler(w io.Writer, f *ast.FuncDecl) {
 	}
 
 	ctx := context.Background()
-	res, err := s.%s(ctx, params)
+	result, err := s.%s(ctx, params)
 	if err != nil {
-		errJSON := fmt.Sprintf("{\"error\": \"%s\"}", err)
-		errRaw, _ := json.Marshal(errJSON)
-		w.WriteHeader(http.StatusInternalServerError)
+		handlerErr := struct {
+			Err string %s
+		}{
+			Err: err.Error(),
+		}
+		errRaw, _ := json.Marshal(handlerErr)
+		
+		if apiErr, isOk := err.(ApiError); isOk {
+			w.WriteHeader(apiErr.HTTPStatus)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 		w.Write(errRaw)
 
 		return
 	}
 
-	resRaw, _ := json.Marshal(res)
+	response := struct{
+		Err string %s
+		Result interface{} %s
+	}{
+		Err: "",
+		Result: result,
+	}
+
+	responseRaw, _ := json.Marshal(response)
 	w.WriteHeader(http.StatusOK)
-	w.Write(resRaw)
+	w.Write(responseRaw)
 }
 
-`, method.Params[0], "%s", method.Name, "%s")
+`, method.Params[0], "`json:\"error\"`", method.Name, "`json:\"error\"`", "`json:\"error\"`", "`json:\"response\"`")
 
 	fmt.Fprint(w, methodHandler)
 }
@@ -294,15 +382,21 @@ func generateSrvs(w io.Writer, srvs map[string][]*Method) {
 	case "%s":
 		s.handle%s(w, r)`, method.URL, method.Name)
 			}
-			fmt.Fprint(w, `
+			fmt.Fprintf(w, `
 	default:
-		errRaw, _ := json.Marshal("{\"error\": \"unknown method\"}")
+		handlerErr := struct {
+			Err string %s
+		}{
+			Err: "unknown method",
+		}
+		errRaw, _ := json.Marshal(handlerErr)
+		
 		w.WriteHeader(http.StatusNotFound)
 		w.Write(errRaw)
 	}
 }
 
-`)
+`, "`json:\"error\"`")
 		}
 	}
 }
@@ -327,7 +421,17 @@ func generateAPI(inputFilePath string, outputFilePath string) error {
 		return err
 	}
 
-	_, err = fmt.Fprintf(outputFile, "import (\n\t\"context\"\n\t\"encoding/json\"\n\t\"errors\"\n\t\"fmt\"\n\t\"net/http\"\n\t\"strconv\"\n)\n\n")
+	_, err = fmt.Fprint(outputFile, `import (
+	"context"
+	"encoding/json"
+	"errors"
+	"io/ioutil"
+	"net/http"
+	"strconv"
+	"strings"
+)
+	
+`)
 	if err != nil {
 		return err
 	}

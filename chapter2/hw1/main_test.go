@@ -338,7 +338,8 @@ func runTests(t *testing.T, ts *httptest.Server, cases []Case) {
 
 		if !reflect.DeepEqual(result, expected) {
 			t.Errorf("[%d] results not match\nGot: %#v\nExpected: %#v", idx, result, item.Result)
-			continue
+			//continue
+			break
 		}
 	}
 }

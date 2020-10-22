@@ -73,7 +73,6 @@ type NewUser struct {
 
 // apigen:api {"url": "/user/profile", "auth": false}
 func (srv *MyApi) Profile(ctx context.Context, in ProfileParams) (*User, error) {
-
 	if in.Login == "bad_user" {
 		return nil, fmt.Errorf("bad user")
 	}
