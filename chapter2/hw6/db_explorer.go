@@ -6,9 +6,18 @@ import (
 	"net/http"
 )
 
+type field struct {
+	name string
+}
+
+type table struct {
+	name   string
+	fields []field
+}
+
 // DbExplorer ...
 type DbExplorer struct {
-	tablesNames []string
+	tables []table
 }
 
 // NewDbExplorer ...
@@ -26,12 +35,14 @@ func NewDbExplorer(db *sql.DB) (*DbExplorer, error) {
 			return nil, err
 		}
 
-		explorer.tablesNames = append(explorer.tablesNames, string(tableName.([]byte)))
+		explorer.tables = append(explorer.tables, table{
+			name: string(tableName.([]byte)),
+		})
 	}
 	rows.Close()
 
-	for _, tableName := range explorer.tablesNames {
-		rows, err = db.Query(fmt.Sprintf("SHOW FULL COLUMNS FROM %s;", tableName))
+	for currTableIdx, currTable := range explorer.tables {
+		rows, err = db.Query(fmt.Sprintf("SHOW FULL COLUMNS FROM %s;", currTable.name))
 		if err != nil {
 			return nil, err
 		}
@@ -49,7 +60,9 @@ func NewDbExplorer(db *sql.DB) (*DbExplorer, error) {
 			}
 
 			if val, isOk := vals[0].(*sql.RawBytes); isOk {
-				fmt.Println(string(*val))
+				explorer.tables[currTableIdx].fields = append(explorer.tables[currTableIdx].fields, field{
+					name: string(*val),
+				})
 			}
 		}
 		rows.Close()
@@ -60,5 +73,9 @@ func NewDbExplorer(db *sql.DB) (*DbExplorer, error) {
 
 // ServeHTTP ...
 func (e *DbExplorer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-
+	switch r.URL.Path {
+	case "/":
+	default:
+		w.WriteHeader(http.StatusInternalServerError)
+	}
 }

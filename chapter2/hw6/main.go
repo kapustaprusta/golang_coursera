@@ -4,6 +4,8 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
+	"net/http"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -20,11 +22,11 @@ func main() {
 		panic(err)
 	}
 
-	_, err = NewDbExplorer(db)
+	handler, err := NewDbExplorer(db)
 	if err != nil {
 		panic(err)
 	}
 
-	// fmt.Println("starting server at :8082")
-	// http.ListenAndServe(":8082", handler)
+	fmt.Println("starting server at :8082")
+	http.ListenAndServe(":8082", handler)
 }
