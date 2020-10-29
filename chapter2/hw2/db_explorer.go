@@ -18,7 +18,7 @@ type Field struct {
 	Key     string // PRI
 	Extra   string // auto_increment
 	Null    string // YES|NO
-	Default interface{}
+	Default string // NULL
 }
 
 // Model ...
@@ -78,7 +78,7 @@ func NewDbExplorer(db *sql.DB) (*DbExplorer, error) {
 			valType, _ := vals[1].(*sql.RawBytes)
 			valIsNull, _ := vals[3].(*sql.RawBytes)
 			valKey, _ := vals[4].(*sql.RawBytes)
-			valDefault := vals[5]
+			valDefault := vals[5].(*sql.RawBytes)
 			valExtra, _ := vals[6].(*sql.RawBytes)
 
 			model.Fields[table] = append(model.Fields[table], Field{
@@ -87,7 +87,7 @@ func NewDbExplorer(db *sql.DB) (*DbExplorer, error) {
 				Key:     string(*valKey),
 				Extra:   string(*valExtra),
 				Null:    string(*valIsNull),
-				Default: valDefault,
+				Default: string(*valDefault),
 			})
 		}
 		rows.Close()
@@ -155,39 +155,61 @@ func (e *DbExplorer) getEntries(name string, limit int, offset int) (map[string]
 	return map[string]interface{}{"records": records}, nil
 }
 
-func (e *DbExplorer) addEntry(name string, vals map[string]interface{}) (map[string]interface{}, error) {
-	fieldsMetaInfo := e.model.Fields[name]
-	for _, metaInfo := range fieldsMetaInfo {
-		if val, isExist := vals[metaInfo.Name]; isExist {
+func (e *DbExplorer) createEntry(name string, vals map[string]interface{}) (map[string]interface{}, error) {
+	fields := e.model.Fields[name]
+	for _, field := range fields {
+		if val, isExist := vals[field.Name]; isExist {
 			// check type
-			if metaInfo.Type == "int" {
+			if field.Type == "int" {
 				if _, isOk := val.(float64); !isOk {
 					// check NULL
-					if metaInfo.Null == "NO" {
+					if field.Null == "NO" {
 						if val == nil {
-							return nil, fmt.Errorf("field %s must not be NULL", metaInfo.Name)
+							return nil, fmt.Errorf("field %s must not be NULL", field.Name)
 						}
 					}
 
-					return nil, fmt.Errorf("field %s have invalid type", metaInfo.Name)
+					return nil, fmt.Errorf("field %s have invalid type", field.Name)
 				}
 			} else {
 				if _, isOk := val.(string); !isOk {
 					// check NULL
-					if metaInfo.Null == "NO" {
+					if field.Null == "NO" {
 						if val == nil {
-							return nil, fmt.Errorf("field %s must not be NULL", metaInfo.Name)
+							return nil, fmt.Errorf("field %s must not be NULL", field.Name)
 						}
 					}
 
-					return nil, fmt.Errorf("field %s have invalid type", metaInfo.Name)
+					return nil, fmt.Errorf("field %s have invalid type", field.Name)
 				}
 			}
 
 			// check KEY and Extra
-			if metaInfo.Key == "PRI" && metaInfo.Extra == "auto_increment" {
-				delete(vals, metaInfo.Name)
+			if field.Key == "PRI" && field.Extra == "auto_increment" {
+				delete(vals, field.Name)
 			}
+		} else {
+			if field.Default == "" && field.Null == "NO" {
+				if field.Type == "int" {
+					vals[field.Name] = 0
+				} else {
+					vals[field.Name] = ""
+				}
+			}
+		}
+	}
+
+	for valName := range vals {
+		isFound := false
+		for _, field := range e.model.Fields[name] {
+			if field.Name == valName {
+				isFound = true
+				break
+			}
+		}
+
+		if !isFound {
+			delete(vals, valName)
 		}
 	}
 
@@ -219,7 +241,15 @@ func (e *DbExplorer) addEntry(name string, vals map[string]interface{}) (map[str
 		return nil, err
 	}
 
-	return map[string]interface{}{"id": lastID}, nil
+	primaryKey := ""
+	for _, fieldMetaInfo := range e.model.Fields[name] {
+		if fieldMetaInfo.Key == "PRI" {
+			primaryKey = fieldMetaInfo.Name
+			break
+		}
+	}
+
+	return map[string]interface{}{primaryKey: lastID}, nil
 }
 
 func (e *DbExplorer) handleTable(w http.ResponseWriter, r *http.Request) {
@@ -229,35 +259,38 @@ func (e *DbExplorer) handleTable(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		limit := 5
+		var err error
 		if limitVals, isExist := r.URL.Query()["limit"]; isExist {
-			limit, _ = strconv.Atoi(limitVals[0])
+			limit, err = strconv.Atoi(limitVals[0])
+			if err != nil {
+				limit = 5
+			}
 		}
 		offset := 0
 		if offsetVals, isExist := r.URL.Query()["offset"]; isExist {
 			offset, _ = strconv.Atoi(offsetVals[0])
 		}
 
-		var err error
 		result, err = e.getEntries(tableName, limit, offset)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 	case http.MethodPut:
-		bodyRaw, err := ioutil.ReadAll(r.Body)
+		valsRaw, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
-		bodyJSON := make(map[string]interface{})
-		err = json.Unmarshal(bodyRaw, &bodyJSON)
+		valsJSON := make(map[string]interface{})
+		err = json.Unmarshal(valsRaw, &valsJSON)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
-		result, err = e.addEntry(tableName, bodyJSON)
+		result, err = e.createEntry(tableName, valsJSON)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
@@ -277,8 +310,213 @@ func (e *DbExplorer) handleTable(w http.ResponseWriter, r *http.Request) {
 	w.Write(responseJSON)
 }
 
+func (e *DbExplorer) getEntry(name string, id int) (map[string]interface{}, error) {
+	primaryKey := ""
+	for _, fieldMetaInfo := range e.model.Fields[name] {
+		if fieldMetaInfo.Key == "PRI" {
+			primaryKey = fieldMetaInfo.Name
+			break
+		}
+	}
+
+	result := e.db.QueryRow(fmt.Sprintf("SELECT * FROM %s WHERE %s = ?;", name, primaryKey), id)
+	valsLen := len(e.model.Fields[name])
+	record := make(map[string]interface{})
+	vals := make([]interface{}, valsLen)
+	for i := 0; i < len(vals); i++ {
+		var tmp interface{}
+		vals[i] = &tmp
+	}
+
+	if err := result.Scan(vals...); err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return nil, fmt.Errorf("record not found")
+		}
+
+		return nil, err
+	}
+
+	for idx, val := range vals {
+		val, _ := val.(*interface{})
+		if e.model.Fields[name][idx].Type == "int" {
+			if valRaw, isOk := (*val).(int64); isOk {
+				record[e.model.Fields[name][idx].Name] = valRaw
+			}
+		} else {
+			if valRaw, isOk := (*val).([]byte); isOk {
+				if len(valRaw) == 0 {
+					record[e.model.Fields[name][idx].Name] = valRaw
+				} else {
+					record[e.model.Fields[name][idx].Name] = string(valRaw)
+				}
+			} else {
+				record[e.model.Fields[name][idx].Name] = val
+			}
+		}
+	}
+
+	return map[string]interface{}{"record": record}, nil
+}
+
+func (e *DbExplorer) upadteEntry(name string, id int, vals map[string]interface{}) (map[string]interface{}, error) {
+	fieldsMetaInfo := e.model.Fields[name]
+	for _, field := range fieldsMetaInfo {
+		if val, isExist := vals[field.Name]; isExist {
+			// check primary key
+			if field.Key == "PRI" {
+				return nil, fmt.Errorf("field %s have invalid type", field.Name)
+			}
+
+			// check type
+			if field.Type == "int" {
+				if _, isOk := val.(float64); !isOk {
+					return nil, fmt.Errorf("field %s have invalid type", field.Name)
+				}
+			} else {
+				if _, isOk := val.(string); !isOk {
+					if val != nil || field.Null == "NO" {
+						return nil, fmt.Errorf("field %s have invalid type", field.Name)
+					}
+				}
+			}
+		}
+	}
+
+	primaryKey := ""
+	for _, fieldMetaInfo := range e.model.Fields[name] {
+		if fieldMetaInfo.Key == "PRI" {
+			primaryKey = fieldMetaInfo.Name
+			break
+		}
+	}
+
+	rowsNames := ""
+	placeholdersCount := 0
+	var placeholdersVals []interface{}
+
+	for cellName, cellVal := range vals {
+		rowsNames += cellName + " = ?"
+		if placeholdersCount != len(vals)-1 {
+			rowsNames += ", "
+		}
+
+		placeholdersVals = append(placeholdersVals, cellVal)
+		placeholdersCount++
+	}
+	placeholdersVals = append(placeholdersVals, id)
+
+	queryStr := fmt.Sprintf("UPDATE %s SET %s WHERE %s = ?;", name, rowsNames, primaryKey)
+	result, err := e.db.Exec(queryStr, placeholdersVals...)
+	if err != nil {
+		return nil, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]interface{}{"updated": rowsAffected}, nil
+}
+
+func (e *DbExplorer) deleteEntry(name string, id int) (map[string]interface{}, error) {
+	primaryKey := ""
+	for _, fieldMetaInfo := range e.model.Fields[name] {
+		if fieldMetaInfo.Key == "PRI" {
+			primaryKey = fieldMetaInfo.Name
+			break
+		}
+	}
+
+	result, err := e.db.Exec(fmt.Sprintf("DELETE FROM %s WHERE %s = ?", name, primaryKey), id)
+	if err != nil {
+		return nil, err
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+
+	return map[string]interface{}{
+		"deleted": rowsAffected,
+	}, nil
+}
+
 func (e *DbExplorer) handleEntry(w http.ResponseWriter, r *http.Request) {
-	fmt.Println(r.URL.Path)
+	splittedURL := strings.Split(r.URL.Path, "/")[1:]
+	tableName := splittedURL[0]
+	recordID, _ := strconv.Atoi(splittedURL[1])
+	var result map[string]interface{}
+
+	switch r.Method {
+	case http.MethodGet:
+		var err error
+		result, err = e.getEntry(tableName, recordID)
+		if err != nil {
+			if err.Error() == "record not found" {
+				w.WriteHeader(http.StatusNotFound)
+			} else {
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+
+			responseErr := map[string]interface{}{"error": err.Error()}
+			responseErrJSON, _ := json.Marshal(responseErr)
+			w.Write(responseErrJSON)
+
+			return
+		}
+	case http.MethodPost:
+		valsRaw, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		valsJSON := make(map[string]interface{})
+		err = json.Unmarshal(valsRaw, &valsJSON)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		result, err = e.upadteEntry(tableName, recordID, valsJSON)
+		if err != nil {
+			if strings.Contains(err.Error(), "have invalid type") {
+				w.WriteHeader(http.StatusBadRequest)
+			} else {
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+
+			responseErr := map[string]interface{}{"error": err.Error()}
+			responseErrJSON, _ := json.Marshal(responseErr)
+			w.Write(responseErrJSON)
+
+			return
+		}
+	case http.MethodDelete:
+		var err error
+		result, err = e.deleteEntry(tableName, recordID)
+		if err != err {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	default:
+		responseErr := map[string]interface{}{
+			"error": "unknown table",
+		}
+		responseErrJSON, _ := json.Marshal(responseErr)
+		w.WriteHeader(http.StatusNotFound)
+		w.Write(responseErrJSON)
+
+		return
+	}
+
+	response := map[string]interface{}{"response": result}
+	responseJSON, err := json.Marshal(response)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write(responseJSON)
 }
 
 // ServeHTTP ...
@@ -286,10 +524,10 @@ func (e *DbExplorer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	urlPath := r.URL.Path
 	if urlPath == "/" {
 		e.handleMain(w, r)
-	} else if e.tableRegexp.MatchString(urlPath) {
-		e.handleTable(w, r)
 	} else if e.entryRegexp.MatchString(urlPath) {
 		e.handleEntry(w, r)
+	} else if e.tableRegexp.MatchString(urlPath) {
+		e.handleTable(w, r)
 	} else {
 		response := map[string]interface{}{"error": "unknown table"}
 		responseJSON, err := json.Marshal(response)

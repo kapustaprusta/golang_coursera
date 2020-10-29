@@ -29,7 +29,7 @@ type Case struct {
 }
 
 var (
-	client = &http.Client{Timeout: time.Second}
+	client = &http.Client{Timeout: time.Second * 10000000}
 )
 
 func PrepareTestApis(db *sql.DB) {
@@ -379,7 +379,7 @@ func TestApis(t *testing.T) {
 			},
 		},
 
-		// и немного по другой таблице
+		//и немного по другой таблице
 		Case{
 			Path: "/users/1",
 			Result: CR{
