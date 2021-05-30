@@ -6,6 +6,7 @@ import (
 	"net"
 	"regexp"
 	"sync"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -16,6 +17,8 @@ import (
 type myService struct {
 	Events      []chan *Event
 	EventsMutex *sync.RWMutex
+	Stats       []Stat
+	StatsMutex  *sync.Mutex
 	ACLRules    map[string][]*regexp.Regexp
 	ACLMutex    *sync.Mutex
 }
@@ -24,6 +27,8 @@ func newMyService(ACLRules map[string][]string) *myService {
 	myService := &myService{
 		Events:      make([]chan *Event, 0),
 		EventsMutex: &sync.RWMutex{},
+		Stats:       make([]Stat, 0),
+		StatsMutex:  &sync.Mutex{},
 		ACLRules:    make(map[string][]*regexp.Regexp),
 		ACLMutex:    &sync.Mutex{},
 	}
@@ -43,6 +48,30 @@ func (ms *myService) addEvent(event *Event) {
 		chanEvents <- event
 	}
 	ms.EventsMutex.Unlock()
+}
+
+func (ms *myService) addByConsumer(consumer string) {
+	ms.StatsMutex.Lock()
+	for idx := 0; idx < len(ms.Stats); idx++ {
+		if ms.Stats[idx].ByConsumer == nil {
+			ms.Stats[idx].ByConsumer = make(map[string]uint64)
+		}
+
+		ms.Stats[idx].ByConsumer[consumer]++
+	}
+	ms.StatsMutex.Unlock()
+}
+
+func (ms *myService) addByMethod(method string) {
+	ms.StatsMutex.Lock()
+	for idx := 0; idx < len(ms.Stats); idx++ {
+		if ms.Stats[idx].ByMethod == nil {
+			ms.Stats[idx].ByMethod = make(map[string]uint64)
+		}
+
+		ms.Stats[idx].ByMethod[method]++
+	}
+	ms.StatsMutex.Unlock()
 }
 
 func (ms *myService) Check(ctx context.Context, nothing *Nothing) (*Nothing, error) {
@@ -75,6 +104,23 @@ func (ms *myService) Logging(nothing *Nothing, srv Admin_LoggingServer) error {
 }
 
 func (ms *myService) Statistics(statInterval *StatInterval, srv Admin_StatisticsServer) error {
+	ms.StatsMutex.Lock()
+	currSrvId := len(ms.Stats)
+	ms.Stats = append(ms.Stats, Stat{})
+	ms.StatsMutex.Unlock()
+	srvTicker := time.NewTicker(time.Second * time.Duration(statInterval.GetIntervalSeconds()))
+
+	for {
+		<-srvTicker.C
+		ms.StatsMutex.Lock()
+		err := srv.Send(&ms.Stats[currSrvId])
+		ms.Stats[currSrvId] = Stat{}
+		ms.StatsMutex.Unlock()
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -95,6 +141,9 @@ func (ms *myService) unaryAuthInterceptor(
 		Consumer: consumer[0],
 		Method:   info.FullMethod,
 	})
+
+	ms.addByConsumer(consumer[0])
+	ms.addByMethod(info.FullMethod)
 
 	ms.ACLMutex.Lock()
 	allowedMethodsRegExp := ms.ACLRules[consumer[0]]
@@ -133,6 +182,9 @@ func (ms *myService) streamAuthInterceptor(
 		Consumer: consumer[0],
 		Method:   info.FullMethod,
 	})
+
+	ms.addByConsumer(consumer[0])
+	ms.addByMethod(info.FullMethod)
 
 	ms.ACLMutex.Lock()
 	allowedMethodsRegExp := ms.ACLRules[consumer[0]]
