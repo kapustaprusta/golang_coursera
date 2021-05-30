@@ -17,7 +17,7 @@ import (
 type myService struct {
 	Events      []chan *Event
 	EventsMutex *sync.RWMutex
-	Stats       []Stat
+	Stats       []chan *Stat
 	StatsMutex  *sync.Mutex
 	ACLRules    map[string][]*regexp.Regexp
 	ACLMutex    *sync.Mutex
@@ -27,7 +27,7 @@ func newMyService(ACLRules map[string][]string) *myService {
 	myService := &myService{
 		Events:      make([]chan *Event, 0),
 		EventsMutex: &sync.RWMutex{},
-		Stats:       make([]Stat, 0),
+		Stats:       make([]chan *Stat, 0),
 		StatsMutex:  &sync.Mutex{},
 		ACLRules:    make(map[string][]*regexp.Regexp),
 		ACLMutex:    &sync.Mutex{},
@@ -52,24 +52,38 @@ func (ms *myService) addEvent(event *Event) {
 
 func (ms *myService) addByConsumer(consumer string) {
 	ms.StatsMutex.Lock()
-	for idx := 0; idx < len(ms.Stats); idx++ {
-		if ms.Stats[idx].ByConsumer == nil {
-			ms.Stats[idx].ByConsumer = make(map[string]uint64)
+	for _, chanStats := range ms.Stats {
+		var currStats *Stat
+		if len(chanStats) == 0 {
+			currStats = &Stat{
+				ByConsumer: make(map[string]uint64),
+				ByMethod:   make(map[string]uint64),
+			}
+		} else {
+			currStats = <-chanStats
 		}
 
-		ms.Stats[idx].ByConsumer[consumer]++
+		currStats.ByConsumer[consumer]++
+		chanStats <- currStats
 	}
 	ms.StatsMutex.Unlock()
 }
 
 func (ms *myService) addByMethod(method string) {
 	ms.StatsMutex.Lock()
-	for idx := 0; idx < len(ms.Stats); idx++ {
-		if ms.Stats[idx].ByMethod == nil {
-			ms.Stats[idx].ByMethod = make(map[string]uint64)
+	for _, chanStats := range ms.Stats {
+		var currStats *Stat
+		if len(chanStats) == 0 {
+			currStats = &Stat{
+				ByConsumer: make(map[string]uint64),
+				ByMethod:   make(map[string]uint64),
+			}
+		} else {
+			currStats = <-chanStats
 		}
 
-		ms.Stats[idx].ByMethod[method]++
+		currStats.ByMethod[method]++
+		chanStats <- currStats
 	}
 	ms.StatsMutex.Unlock()
 }
@@ -105,17 +119,15 @@ func (ms *myService) Logging(nothing *Nothing, srv Admin_LoggingServer) error {
 
 func (ms *myService) Statistics(statInterval *StatInterval, srv Admin_StatisticsServer) error {
 	ms.StatsMutex.Lock()
-	currSrvId := len(ms.Stats)
-	ms.Stats = append(ms.Stats, Stat{})
+	currSrvStats := make(chan *Stat, 1)
+	ms.Stats = append(ms.Stats, currSrvStats)
 	ms.StatsMutex.Unlock()
 	srvTicker := time.NewTicker(time.Second * time.Duration(statInterval.GetIntervalSeconds()))
 
 	for {
 		<-srvTicker.C
-		ms.StatsMutex.Lock()
-		err := srv.Send(&ms.Stats[currSrvId])
-		ms.Stats[currSrvId] = Stat{}
-		ms.StatsMutex.Unlock()
+		lastStat := <-currSrvStats
+		err := srv.Send(lastStat)
 		if err != nil {
 			return err
 		}
